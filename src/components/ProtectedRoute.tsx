@@ -22,6 +22,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const bootTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const authCheckRequestIdRef = useRef(0);
 
   // Boot timeout safety net — if isLoading stays true for >8 seconds
   // (e.g., auth status stuck at 'booting'), redirect to login instead
@@ -29,7 +30,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // (instant boot from localStorage), this should rarely trigger.
   useEffect(() => {
     if (isLoading) {
+      const capturedRequestId = authCheckRequestIdRef.current;
       bootTimeoutRef.current = setTimeout(() => {
+        if (authCheckRequestIdRef.current !== capturedRequestId) return;
         console.warn(
           '[ProtectedRoute] Boot timeout reached (8s). Redirecting to login.'
         );
@@ -52,28 +55,33 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     };
   }, [isLoading, location.hash, location.pathname, location.search, navigate]);
 
-  const checkAuthAndOnboarding = async () => {
+  const checkAuthAndOnboarding = async (requestId: number) => {
+    const isCurrentRequest = () => authCheckRequestIdRef.current === requestId;
+    const guardedNavigate = (to: string) => {
+      if (!isCurrentRequest()) return;
+      navigate(to, { replace: true });
+    };
     let shouldSettleLoading = true;
     try {
       if (status === 'booting') {
-        setIsLoading(true);
+        if (isCurrentRequest()) {
+          setIsLoading(true);
+        }
         shouldSettleLoading = false;
         return;
       }
 
       if (!config.supabaseClient) {
-        navigate(
-          buildLoginRedirectPath(location.pathname, location.search, location.hash),
-          { replace: true }
+        guardedNavigate(
+          buildLoginRedirectPath(location.pathname, location.search, location.hash)
         );
         return;
       }
 
       const user = session?.user;
       if (!user) {
-        navigate(
-          buildLoginRedirectPath(location.pathname, location.search, location.hash),
-          { replace: true }
+        guardedNavigate(
+          buildLoginRedirectPath(location.pathname, location.search, location.hash)
         );
         return;
       }
@@ -82,6 +90,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         config.supabaseClient,
         user.id
       );
+      if (!isCurrentRequest()) return;
 
       const isOnOnboardingPage = location.pathname.startsWith('/onboarding/');
       const isOnFinancialLinkPage = location.pathname === FINANCIAL_LINK_ROUTE;
@@ -90,41 +99,51 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
         onboardingData?.financial_link_status
       );
 
-      if (!onboardingData || !onboardingData.is_completed) {
+      if (
+  !onboardingData ||
+  (!onboardingData.is_completed && financialLinkStatus === 'pending')
+) {
         if (
           !isOnOnboardingPage &&
           !(isInvestorProfileAlias && financialLinkStatus !== 'pending')
         ) {
-          navigate(FINANCIAL_LINK_ROUTE, { replace: true });
+          guardedNavigate(FINANCIAL_LINK_ROUTE);
           return;
         }
 
         if (!isOnFinancialLinkPage && financialLinkStatus === 'pending') {
-          navigate(FINANCIAL_LINK_ROUTE, { replace: true });
+          guardedNavigate(FINANCIAL_LINK_ROUTE);
           return;
         }
       }
 
       console.log('[ProtectedRoute] Authorization check passed');
-      setIsAuthorized(true);
+      if (isCurrentRequest()) {
+        setIsAuthorized(true);
+      }
     } catch (error) {
       console.error("Error checking auth:", error);
-      navigate(
-        buildLoginRedirectPath(location.pathname, location.search, location.hash),
-        { replace: true }
+      guardedNavigate(
+        buildLoginRedirectPath(location.pathname, location.search, location.hash)
       );
     } finally {
-      if (shouldSettleLoading) {
+      if (shouldSettleLoading && isCurrentRequest()) {
         setIsLoading(false);
       }
     }
   };
 
   useEffect(() => {
+    const requestId = ++authCheckRequestIdRef.current;
     if (status !== 'authenticated') {
       setIsAuthorized(false);
     }
-    checkAuthAndOnboarding();
+    checkAuthAndOnboarding(requestId);
+    return () => {
+      if (authCheckRequestIdRef.current === requestId) {
+        authCheckRequestIdRef.current += 1;
+      }
+    };
   }, [location.hash, location.pathname, location.search, navigate, session?.user?.id, status]);
 
   if (isLoading) {

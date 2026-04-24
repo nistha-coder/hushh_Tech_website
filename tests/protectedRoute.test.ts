@@ -122,4 +122,99 @@ describe("ProtectedRoute", () => {
 
     expect(container.textContent).toContain("protected content");
   });
+
+  it("ignores stale async onboarding checks and keeps latest authorization outcome", async () => {
+    authState.status = "authenticated";
+    authState.session = { user: { id: "user-1" } };
+
+    let resolveFirst:
+      | ((value: {
+          current_step: number;
+          is_completed: boolean;
+          financial_link_status: string;
+        }) => void)
+      | null = null;
+    const firstPromise = new Promise<{
+      current_step: number;
+      is_completed: boolean;
+      financial_link_status: string;
+    }>((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    let callCount = 0;
+    onboardingProgressMock.mockImplementation(() => {
+      callCount += 1;
+      if (callCount === 1) return firstPromise;
+      return Promise.resolve({
+        current_step: 1,
+        is_completed: false,
+        financial_link_status: "completed",
+      });
+    });
+
+    await act(async () => {
+      root.render(
+        React.createElement(
+          MemoryRouter,
+          { initialEntries: ["/profile"] },
+          React.createElement(
+            Routes,
+            null,
+            React.createElement(Route, {
+              path: "/profile",
+              element: React.createElement(
+                ProtectedRoute,
+                null,
+                React.createElement("div", null, "protected content")
+              ),
+            }),
+            React.createElement(Route, {
+              path: "/onboarding/financial-link",
+              element: React.createElement("div", null, "financial-link page"),
+            })
+          )
+        )
+      );
+    });
+
+    authState.session = { user: { id: "user-2" } };
+    await act(async () => {
+      root.render(
+        React.createElement(
+          MemoryRouter,
+          { initialEntries: ["/profile"] },
+          React.createElement(
+            Routes,
+            null,
+            React.createElement(Route, {
+              path: "/profile",
+              element: React.createElement(
+                ProtectedRoute,
+                null,
+                React.createElement("div", null, "protected content")
+              ),
+            }),
+            React.createElement(Route, {
+              path: "/onboarding/financial-link",
+              element: React.createElement("div", null, "financial-link page"),
+            })
+          )
+        )
+      );
+    });
+
+    await flush();
+    expect(container.textContent).toContain("protected content");
+
+    resolveFirst?.({
+      current_step: 1,
+      is_completed: false,
+      financial_link_status: "pending",
+    });
+    await flush();
+
+    expect(container.textContent).toContain("protected content");
+    expect(container.textContent).not.toContain("financial-link page");
+  });
 });
