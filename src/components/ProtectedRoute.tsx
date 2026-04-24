@@ -30,9 +30,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   // (instant boot from localStorage), this should rarely trigger.
   useEffect(() => {
     if (isLoading) {
-      const capturedRequestId = authCheckRequestIdRef.current;
       bootTimeoutRef.current = setTimeout(() => {
-        if (authCheckRequestIdRef.current !== capturedRequestId) return;
         console.warn(
           '[ProtectedRoute] Boot timeout reached (8s). Redirecting to login.'
         );
