@@ -81,6 +81,11 @@ import MetricsPage from './pages/metrics';
 
 const KaiIndiaApp = React.lazy(() => import('./kai-india/pages'));
 
+const RedirectWithQuery = ({ to }: { to: string }) => {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}${location.hash}`} replace />;
+};
+
 // Content wrapper component that applies conditional margin
 const ContentWrapper = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
@@ -167,9 +172,9 @@ function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/contact" element={<Contact />} />
 
-            <Route path="/Login" element={<Navigate to="/login" replace />} />
-            <Route path="/Signup" element={<Navigate to="/signup" replace />} />
-            <Route path="/Contact" element={<Navigate to="/contact" replace />} />
+            <Route path="/Login" element={<RedirectWithQuery to="/login" />} />
+            <Route path="/Signup" element={<RedirectWithQuery to="/signup" />} />
+            <Route path="/Contact" element={<RedirectWithQuery to="/contact" />} />
             <Route path="/benefits" element={<BenefitsPage />} />
             <Route path='/services/consumers' element={<Consumers />} />
             <Route path='/services/business' element={<Business />} />
