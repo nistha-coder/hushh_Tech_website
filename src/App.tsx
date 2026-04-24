@@ -163,12 +163,16 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/about/leadership" element={<Leadership />} />
             <Route path="/about/philosophy" element={<Philosophy />} />
-            <Route path="/Login" element={<LoginPage />} />
-            <Route path="/Contact" element={<Contact />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/contact" element={<Contact />} />
+
+            <Route path="/Login" element={<Navigate to="/login" replace />} />
+            <Route path="/Signup" element={<Navigate to="/signup" replace />} />
+            <Route path="/Contact" element={<Navigate to="/contact" replace />} />
             <Route path="/benefits" element={<BenefitsPage />} />
             <Route path='/services/consumers' element={<Consumers />} />
             <Route path='/services/business' element={<Business />} />
-            <Route path='/Signup' element={<SignupPage />} />
             <Route path='/faq' element={<Faq />} />
             <Route path='/profile' element={
               <AuthRequiredRoute>
