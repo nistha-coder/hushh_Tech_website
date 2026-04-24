@@ -132,15 +132,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   };
 
   useEffect(() => {
-    const requestId = ++authCheckRequestIdRef.current;
+    const requestId = authCheckRequestIdRef.current;
     if (status !== 'authenticated') {
       setIsAuthorized(false);
     }
     checkAuthAndOnboarding(requestId);
     return () => {
-      if (authCheckRequestIdRef.current === requestId) {
-        authCheckRequestIdRef.current += 1;
-      }
+      authCheckRequestIdRef.current += 1;
     };
   }, [location.hash, location.pathname, location.search, navigate, session?.user?.id, status]);
 
